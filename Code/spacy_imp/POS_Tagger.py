@@ -1,12 +1,7 @@
 
 # coding: utf-8
 
-# In[16]:
-
-#!/usr/bin/python
-
-
-# In[17]:
+# In[22]:
 
 """
 Averaged perceptron classifier. Implementation geared for simplicity rather than
@@ -19,6 +14,13 @@ from collections import defaultdict
 from collections import defaultdict
 import pickle
 import random
+
+import logging
+
+from textblob.base import BaseTagger
+from textblob.tokenizers import WordTokenizer, SentenceTokenizer
+from textblob.exceptions import MissingCorpusError
+
 
 
 class AveragedPerceptron(object):
@@ -146,7 +148,7 @@ def train(nr_iter, examples):
     return model
 
 
-# In[18]:
+# In[23]:
 
 
 PICKLE = "trontagger-0.1.0.pickle"
@@ -310,10 +312,9 @@ def _pc(n, d):
     return (float(n) / d) * 100
 
 
-# In[19]:
+# In[ ]:
 
-def test1():
-    print "hey"
+
 
 
 # In[ ]:

@@ -1,13 +1,15 @@
 
 # coding: utf-8
 
-# In[33]:
+# In[76]:
 
 from POS_Tagger import PerceptronTagger, AveragedPerceptron
+reload(POS_Tagger)
 #from POS_Tagger import PerceptronTagger
 
 
-# In[34]:
+# In[91]:
+
 
 class Parse(object):
     def __init__(self, n):
@@ -16,8 +18,8 @@ class Parse(object):
         self.lefts = []
         self.rights = []
         for i in range(n+1):
-            self.lefts.append(DefaultList(0))
-            self.rights.append(DefaultList(0))
+            self.lefts.append([])
+            self.rights.append([])
     
     def add_arc(self, head, child):
         self.heads[child] = head
@@ -53,9 +55,13 @@ class Spacy_Parser(object):
         self.model = AveragedPerceptron()
         self.tagdict = {}
         self.classes = set()
-            
+        
+    def train_tagger(self, sentences_with_tags, num_iters=5):
+        self.tagger.train(sentences_with_tags, nr_iter=num_iters)
+        
     def parse(self, words):
-        tags = self.tagger(words)
+        sentence = self.tagger.tag(words)
+        tags = sentence.pos_tags()
         n = len(words)
         idx = 1
         stack = [0]
@@ -66,12 +72,14 @@ class Spacy_Parser(object):
             valid_moves = get_valid_moves(i, n, len(stack))
             next_move = max(valid_moves, key=lambda move: scores[move])
             idx = transition(next_move, idx, stack, parse)
-        return tags, parse
+        sentence.set_heads(parse)#still not sure what parse is
+        return sentence
  
     def train_one(self, itn, words, gold_tags, gold_heads):
+        #spacy blog says using gold tags is not the move
         n = len(words)
         i = 2; stack = [1]; parse = Parse(n)
-        tags = self.tagger.tag(words)
+        tags = self.tagger.tag(" ".join(words)).pos_tags()
         while stack or (i + 1) < n:
             features = extract_features(words, tags, i, n, stack, parse)
             scores = self.model.score(features)
@@ -83,6 +91,35 @@ class Spacy_Parser(object):
         i = transition(guess, i, stack, parse)
         # Return number correct
         return len([i for i in range(n-1) if parse.heads[i] == gold_heads[i]])
+    
+    def train(self, sentences, save_loc=None, nr_iter=5, dont_allow=None):
+        '''Train a model from sentences, and save it at ``save_loc``. ``nr_iter``
+        controls the number of Perceptron training iterations.
+        :param sentences: A list of (words, tags) tuples.
+        :param save_loc: If not ``None``, saves a pickled model in this location.
+        :param nr_iter: Number of training iterations.
+        '''
+        
+        self._make_tagdict(sentences)
+        self.model.classes = self.classes
+        prev, prev2 = self.START
+        for iter_ in range(nr_iter):
+            c = 0
+            n = 0
+            for sentence in sentences:
+                words = sentence.words()
+                tags = sentence.pos_tags()
+                head = sentence.heads() #indeces
+                
+                train_one(2, words, tags, heads)
+            random.shuffle(sentences)
+            logging.info("Iter {0}: {1}/{2}={3}".format(iter_, c, n, _pc(c, n)))
+        self.model.average_weights()
+        # Pickle as a binary file
+        if save_loc is not None:
+            pickle.dump((self.model.weights, self.tagdict, self.classes),
+                         open(save_loc, 'wb'), -1)
+        return None
 
     def get_valid_moves(i, n, stack_depth):
         moves = []
@@ -200,6 +237,56 @@ def extract_features(words, tags, n0, n, stack, parse):
         if w_t or v_d:
             features['val/d-%d %s %d' % (i, w_t, v_d)] = 1
     return features
+
+
+# In[55]:
+
+import codecs
+#### get training set from UD
+def load_tagged_sentences(file_name):
+    sentences_w_tags = []
+    count = 0
+    words=[]
+    tags=[]
+    on_sentence = False
+    for line in codecs.open(file_name, 'r', encoding="utf-8"):
+    
+        vals = line.split('\t')
+        if (len(vals) > 1):
+            on_sentence = True
+            words.append(vals[1])
+            tags.append(vals[3])
+        elif (on_sentence):
+            on_sentence=False
+            sentences_w_tags.append((words, tags))
+            words=[]
+            tags=[]
+    
+    return sentences_w_tags # [ (["word", "word", "word"], ["tag", "tag", "tag"]), next sentece...]
+
+
+# In[56]:
+
+parser = Spacy_Parser() 
+eng_train = "../../Data/UD_English/en-ud-train.conllu"
+
+tagged_data = load_tagged_sentences(eng_train)
+
+
+
+# In[68]:
+
+parser.train_tagger(tagged_data)
+
+
+# In[92]:
+
+parser.tagger.tag(" ".join(["these", "are", "some", "words", "to", "be", "tagged", ".","\n","a"]))
+
+
+# In[90]:
+
+
 
 
 # In[ ]:

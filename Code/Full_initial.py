@@ -23,6 +23,7 @@ def convert_corpus_to_sentence_list(corpus):
 def convert_sentence_list_no_tags_to_corpus(sentence_list):
     return "\n".join(" ".join(x) for x in sentence_list)
     
+#obsolete
 def convert_tagged_to_train_format(tagged_sent_list):
     train_list = []
     for sent in tagged_sent_list:
@@ -36,7 +37,7 @@ def convert_tagged_to_train_format(tagged_sent_list):
     
 
 
-# In[64]:
+# In[24]:
 
 import codecs
 #### get training set from UD
@@ -46,7 +47,7 @@ def load_tagged_sentences(file_name):
     words=[]
     tags=[]
     on_sentence = False
-    for line in codecs.open(trainFile, 'r', encoding="utf-8"):
+    for line in codecs.open(file_name, 'r', encoding="utf-8"):
     
         vals = line.split('\t')
         if (len(vals) > 1):

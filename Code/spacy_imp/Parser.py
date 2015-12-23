@@ -1,16 +1,29 @@
 
 # coding: utf-8
 
-# In[76]:
+# In[39]:
 
+import POS_Tagger
 from POS_Tagger import PerceptronTagger, AveragedPerceptron
 reload(POS_Tagger)
 #from POS_Tagger import PerceptronTagger
 
 
-# In[91]:
+# In[37]:
 
-
+def transition(move, i, stack, parse):
+    global SHIFT, RIGHT, LEFT
+    if move == SHIFT:
+        stack.append(i)
+        return i + 1
+    elif move == RIGHT:
+        parse.add_arc(stack[-2], stack.pop())
+        return i
+    elif move == LEFT:
+        parse.add_arc(i, stack.pop())
+        return i
+    raise GrammarError("Unknown move: %d" % move)
+    
 class Parse(object):
     def __init__(self, n):
         self.n = n
@@ -30,19 +43,6 @@ class Parse(object):
             
     SHIFT = 0; RIGHT = 1; LEFT = 2
     MOVES = [SHIFT, RIGHT, LEFT]
- 
-    def transition(move, i, stack, parse):
-        global SHIFT, RIGHT, LEFT
-        if move == SHIFT:
-            stack.append(i)
-            return i + 1
-        elif move == RIGHT:
-            parse.add_arc(stack[-2], stack.pop())
-            return i
-        elif move == LEFT:
-            parse.add_arc(i, stack.pop())
-            return i
-        raise GrammarError("Unknown move: %d" % move)
         
 class Spacy_Parser(object):
 
@@ -59,21 +59,24 @@ class Spacy_Parser(object):
     def train_tagger(self, sentences_with_tags, num_iters=5):
         self.tagger.train(sentences_with_tags, nr_iter=num_iters)
         
-    def parse(self, words):
-        sentence = self.tagger.tag(words)
-        tags = sentence.pos_tags()
-        n = len(words)
-        idx = 1
-        stack = [0]
-        deps = Parse(n)
-        while stack or idx < n:
-            features = extract_features(words, tags, idx, n, stack, deps)
-            scores = self.model.score(features)
-            valid_moves = get_valid_moves(i, n, len(stack))
-            next_move = max(valid_moves, key=lambda move: scores[move])
-            idx = transition(next_move, idx, stack, parse)
-        sentence.set_heads(parse)#still not sure what parse is
-        return sentence
+    def parse(self, corpus):
+        sentences = self.tagger.tag(corpus)
+        
+        for sentence in sentences:
+            words = sentence.words()
+            tags = sentence.pos_tags()
+            n = len(words)
+            idx = 1
+            stack = [0]
+            deps = Parse(n)
+            while stack or idx < n:
+                features = extract_features(words, tags, idx, n, stack, deps)
+                scores = self.model.score(features)
+                valid_moves = get_valid_moves(i, n, len(stack))
+                next_move = max(valid_moves, key=lambda move: scores[move])
+                idx = transition(next_move, idx, stack, parse)
+            sentence.set_heads(parse)#still not sure what parse is
+        return sentences
  
     def train_one(self, itn, words, gold_tags, gold_heads):
         #spacy blog says using gold tags is not the move
@@ -85,7 +88,7 @@ class Spacy_Parser(object):
             scores = self.model.score(features)
             valid_moves = get_valid_moves(i, n, len(stack))
             guess = max(valid_moves, key=lambda move: scores[move])
-            gold_moves = get_gold_moves(i, n, stack, parse.heads, gold_heads)
+            gold_moves = self.get_gold_moves(i, n, stack, parse.heads, gold_heads)
             best = max(gold_moves, key=lambda move: scores[move])
         self.model.update(best, guess, features)
         i = transition(guess, i, stack, parse)
@@ -121,15 +124,42 @@ class Spacy_Parser(object):
                          open(save_loc, 'wb'), -1)
         return None
 
-    def get_valid_moves(i, n, stack_depth):
-        moves = []
-        if i < n:
-            moves.append(SHIFT)
-        if stack_depth <= 2:
-            moves.append(RIGHT)
-        if stack_depth <= 1:
-            moves.append(LEFT)
-        return moves
+def get_valid_moves(i, n, stack_depth):
+    moves = []
+    if i < n:
+        moves.append(SHIFT)
+    if stack_depth <= 2:
+         moves.append(RIGHT)
+    if stack_depth <= 1:
+        moves.append(LEFT)
+    return moves
+    
+def get_gold_moves(n0, n, stack, heads, gold):
+    def deps_between(target, others, gold):
+        for word in others:
+            if gold[word] == target or gold[target] == word:
+                return True
+        return False
+ 
+    valid = get_valid_moves(n0, n, len(stack))
+    if not stack or (SHIFT in valid and gold[n0] == stack[-1]):
+        return [SHIFT]
+    if gold[stack[-1]] == n0:
+        return [LEFT]
+    costly = set([m for m in MOVES if m not in valid])
+    # If the word behind s0 is its gold head, Left is incorrect
+    if len(stack) >= 2 and gold[stack[-1]] == stack[-2]:
+        costly.add(LEFT)
+    # If there are any dependencies between n0 and the stack,
+    # pushing n0 will lose them.
+    if SHIFT not in costly and deps_between(n0, stack, gold):
+        costly.add(SHIFT)
+    # If there are any dependencies between s0 and the buffer, popping
+    # s0 will lose them.
+    if deps_between(stack[-1], range(n0+1, n-1), gold):
+        costly.add(LEFT)
+        costly.add(RIGHT)
+    return [m for m in MOVES if m not in costly]
     
 def extract_features(words, tags, n0, n, stack, parse):
     def get_stack_context(depth, stack, data):
@@ -239,52 +269,12 @@ def extract_features(words, tags, n0, n, stack, parse):
     return features
 
 
-# In[55]:
-
-import codecs
-#### get training set from UD
-def load_tagged_sentences(file_name):
-    sentences_w_tags = []
-    count = 0
-    words=[]
-    tags=[]
-    on_sentence = False
-    for line in codecs.open(file_name, 'r', encoding="utf-8"):
-    
-        vals = line.split('\t')
-        if (len(vals) > 1):
-            on_sentence = True
-            words.append(vals[1])
-            tags.append(vals[3])
-        elif (on_sentence):
-            on_sentence=False
-            sentences_w_tags.append((words, tags))
-            words=[]
-            tags=[]
-    
-    return sentences_w_tags # [ (["word", "word", "word"], ["tag", "tag", "tag"]), next sentece...]
-
-
-# In[56]:
-
-parser = Spacy_Parser() 
-eng_train = "../../Data/UD_English/en-ud-train.conllu"
-
-tagged_data = load_tagged_sentences(eng_train)
+# In[ ]:
 
 
 
-# In[68]:
 
-parser.train_tagger(tagged_data)
-
-
-# In[92]:
-
-parser.tagger.tag(" ".join(["these", "are", "some", "words", "to", "be", "tagged", ".","\n","a"]))
-
-
-# In[90]:
+# In[ ]:
 
 
 

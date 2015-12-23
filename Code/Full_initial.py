@@ -5,14 +5,17 @@
 # getting aroung 94% accuracy for english and spanish trained on UD data sets ~12,000 training sentence for english, ~7,000? sentences for spanish<br>
 # need to check if I'm doing something wrong, or just need more training samples. Blog claims 97.something% accuracy
 
-# In[22]:
+# In[665]:
 
 from spacy_imp.POS_Tagger import PerceptronTagger
+from spacy_imp.nlp_jtk import Token, Sentence
+reload(spacy_imp.POS_Tagger)
+reload(spacy_imp.nlp_jtk)
 
 
 # # Helper functions: setup, alignment mapping, test/check...etc
 
-# In[93]:
+# In[666]:
 
 def convert_corpus_to_sentence_list(corpus):
     sentence_list=[]
@@ -20,8 +23,8 @@ def convert_corpus_to_sentence_list(corpus):
         sentence_list.append(sentence.split(" "))
     return sentence_list
 
-def convert_sentence_list_no_tags_to_corpus(sentence_list):
-    return "\n".join(" ".join(x) for x in sentence_list)
+def convert_sentence_list_to_untagged_corpus(sentence_list):
+    return "\n".join(" ".join(x.words()) for x in sentence_list)
     
 #obsolete
 def convert_tagged_to_train_format(tagged_sent_list):
@@ -37,7 +40,7 @@ def convert_tagged_to_train_format(tagged_sent_list):
     
 
 
-# In[24]:
+# In[667]:
 
 import codecs
 #### get training set from UD
@@ -46,33 +49,36 @@ def load_tagged_sentences(file_name):
     count = 0
     words=[]
     tags=[]
+    sentence_obj = Sentence()
     on_sentence = False
     for line in codecs.open(file_name, 'r', encoding="utf-8"):
     
         vals = line.split('\t')
         if (len(vals) > 1):
             on_sentence = True
-            words.append(vals[1])
-            tags.append(vals[3])
+            tok = Token()
+            tok.orig = vals[1]
+            tok.pos_tag = vals[3]
+            tok.head = int(vals[6])
+            sentence_obj.add_token(tok)
         elif (on_sentence):
             on_sentence=False
-            sentences_w_tags.append((words, tags))
-            words=[]
-            tags=[]
+            sentences_w_tags.append(sentence_obj)
+            sentence_obj = Sentence()
     
-    return sentences_w_tags # [ (["word", "word", "word"], ["tag", "tag", "tag"]), next sentece...]
+    return sentences_w_tags # [ Sentence_obj, Sentence_obj]
 
 
-# In[36]:
+# In[668]:
 
-#args sentences_with_tags = [ (["word", "word", "word"], ["tag", "tag", "tag"]), next sentece...]
+
 def train_tagger(tagger, sentences_with_tags, num_iters=5):
     print str(len(sentences_with_tags)) + " training sentences"
     print str(num_iters) + " training iterations"
     tagger.train(sentences_with_tags, nr_iter=num_iters)
 
 
-# In[65]:
+# In[669]:
 
 import codecs
 # return arg1 sentences with word/tokens seperated by a " " and sentences seperated by "\n" 
@@ -81,38 +87,34 @@ def get_test_corpus(file_name):
     corpus=""
     words=[]
     test_correct_tags=[]
-    sentence_tags = []
-    sentence_count = 0
+    sentence_tags = Sentence()
     on_sentence = False
     for line in codecs.open(file_name,'r', encoding="utf-8"):
 
         vals = line.split('\t')
         if (len(vals) > 1):
             on_sentence=True
-            words.append(vals[1])
-            sentence_tags.append((vals[1],vals[3]))
+            tok = Token(vals[1],vals[3], vals[6], 0)
+            sentence_tags.add_token(tok)
         elif(on_sentence):
-            sentence_count +=1
             on_sentence = False
-            words.append("\n")
             test_correct_tags.append(sentence_tags)
-            sentence_tags = []
+            sentence_tags = Sentence()
 
 
-    corpus = " ".join(words)
-    print str(sentence_count) + " sentences in test corpus"
-    return corpus, test_correct_tags
+    print str(len(test_correct_tags)) + " sentences in test corpus"
+    return test_correct_tags
 
 
-# In[7]:
+# In[670]:
 
 #expects corpus in the same form as get test corpus returns as arg1
-# returns list ["word", "tag", float_confidence]
+# returns list of Sentence objects
 def tag_tagger(tagger, corpus, dont_allow=None):
     return tagger.tag(corpus, False, dont_allow)
 
 
-# In[8]:
+# In[671]:
 
 import statistics as s
 import copy
@@ -134,18 +136,18 @@ def analyze_tags(guess_tags, correct_tags, show_full=False, sort_key=lambda ((ke
     for sent_num, correct_sentence in enumerate(correct_tags):
 
         perfect_sentence = True
-        for word_idx, word_tag_tuple in enumerate(correct_sentence):
-            guess_tuple = guess_tags[sent_num][word_idx]
-            word = guess_tuple[0]
-            tag_guess = guess_tuple[1]
-            guess_confidence = guess_tuple[2]
+        for word_idx, correct_token in enumerate(correct_sentence.get_tokens()):
+            guess_token = guess_tags[sent_num].get_token_at(word_idx)
+            word = guess_token.orig
+            tag_guess = guess_token.pos_tag
+            guess_confidence = guess_token.conf
             total_tags +=1
             
-            if(word_tag_tuple[1] != tag_guess):
+            if(correct_token.pos_tag != tag_guess):
                 total_wrong_tags +=1
                 conf_wrong.append(guess_confidence)
                 perfect_sentence = False
-                error_tuple = (word_tag_tuple[1], tag_guess)
+                error_tuple = (correct_token.pos_tag, tag_guess)
                 wrong_tag_type[error_tuple] = wrong_tag_type.get(error_tuple, 0) + 1
             else:
                 correct_tag_type[tag_guess] = correct_tag_type.get(tag_guess, 0) + 1
@@ -174,7 +176,7 @@ def analyze_tags(guess_tags, correct_tags, show_full=False, sort_key=lambda ((ke
 
 
 
-# In[85]:
+# In[672]:
 
 import codecs
 # loads src and target original documents and loads alignments into list of tuples
@@ -216,7 +218,7 @@ def get_alignment_info(source_file, tgt_file, align_file, num_matches=1000):
     return orig_sentences, target_sentences, sentence_word_mappings
 
 
-# In[10]:
+# In[673]:
 
 #some sort of check to see if the alignment is "good" enough, filters if not
 def filter_alignments(src_sent_list, tgt_sent_list, align_pairing_list):
@@ -231,17 +233,18 @@ def filter_alignments(src_sent_list, tgt_sent_list, align_pairing_list):
     return len(tgt_sent_list)-n > len(align_pairing_list)
 
 
-# In[11]:
+# In[674]:
 
 untagged_tag_str = "NOTAG"
 #create a sentence list for training from tagged source language file and maps using alignments to the target language
 def map_tags(tagged_src, untagged_tgt, alignment_list):
     tagged_tgt =[]
     for sentence in untagged_tgt:
-        sent_tag_tuple_list = []
+        sent_token_list = Sentence()
         for word in sentence:
-            sent_tag_tuple_list.append((word, untagged_tag_str))
-        tagged_tgt.append(sent_tag_tuple_list)
+            sent_token_list.add_token(Token(word, untagged_tag_str, 0, 0))
+            
+        tagged_tgt.append(sent_token_list)
             
     count = 0
     for sent_num, pairings in enumerate(alignment_list):
@@ -249,13 +252,12 @@ def map_tags(tagged_src, untagged_tgt, alignment_list):
             src_tag_idx = pair[0]
             tgt_tag_idx = pair[1]
 
-            word = tagged_tgt[sent_num][tgt_tag_idx][0]
-            tagged_tgt[sent_num][tgt_tag_idx] = (word, tagged_src[sent_num][src_tag_idx][1])
+            tagged_tgt[sent_num].get_token_at(tgt_tag_idx).pos_tag = tagged_src[sent_num].get_token_at(src_tag_idx).pos_tag
     
     return tagged_tgt
 
 
-# In[28]:
+# In[675]:
 
 #remove sentence that have a low overall confidence per word - or maybe sentences that contain 1 or more very
 # unconfident words - then use that corpus to map to target language 
@@ -265,10 +267,9 @@ def filter_tagged_corpus(tagged_src_sents, untagged_corresp_sents, alignments, a
     for sent_num, sentence in enumerate(tagged_src_sents):
         conf_sum = 0
         removed = False
-        for word_tag_conf_tup in sentence:
-            conf = word_tag_conf_tup[2]
-            conf_sum += conf
-            if conf < word_conf_cutoff:
+        for tok in sentence.get_tokens():
+            conf_sum +=  tok.conf
+            if tok.conf < word_conf_cutoff:
                 removed = True
                 
         if(len(sentence)==0):
@@ -292,7 +293,7 @@ def filter_tagged_corpus(tagged_src_sents, untagged_corresp_sents, alignments, a
         del alignments[idx]
 
 
-# In[13]:
+# In[676]:
 
 start1 = "START1"
 start2 = "START2"
@@ -301,7 +302,7 @@ end2 = "END2"
 def generate_pos_trigrams(tagged_sent_list, ignore_tag=""):
     trigram_count_dict = {}
     for sentence in tagged_sent_list:
-        tags = [start1, start2] + [i[1] for i in sentence] + [end1, end2]
+        tags = [start1, start2] + [tok.pos_tag for tok in sentence.get_tokens()] + [end1, end2]
         for idx in range(len(tags)-2):
             tri = tags[idx:idx+3]
 
@@ -311,7 +312,7 @@ def generate_pos_trigrams(tagged_sent_list, ignore_tag=""):
     return trigram_count_dict
 
 
-# In[35]:
+# In[677]:
 
 def replace_NOTAG_using_trigram(trigram_dict, partially_tagged_sent_list, notag_str="NOTAG"):
     taglist=[]
@@ -321,7 +322,7 @@ def replace_NOTAG_using_trigram(trigram_dict, partially_tagged_sent_list, notag_
                 taglist.append(tag)
 
     for sentence in partially_tagged_sent_list:
-        tags = [start1, start2] + [i[1] for i in sentence] + [end1, end2]
+        tags = [start1, start2] + [tok.pos_tag for tok in sentence.get_tokens()] + [end1, end2]
         indeces_of_notag = []
 
         for idx in range(len(tags)-2):
@@ -350,12 +351,12 @@ def replace_NOTAG_using_trigram(trigram_dict, partially_tagged_sent_list, notag_
             highest_likelyhood_tag = max(candidate_tag_score_dict, key=lambda x: (candidate_tag_score_dict[x],x))
 
             real_idx = notag_index-2
-            word = sentence[real_idx][0]
-            sentence[real_idx] = (word, highest_likelyhood_tag)
+
+            sentence.get_token_at(real_idx).pos_tag = highest_likelyhood_tag
                                          
 
 
-# In[66]:
+# In[640]:
 
 untagged_tag_str = "NOTAG"
 
@@ -375,49 +376,59 @@ testFile=en_test_file
 
 # ### Load, Train and Test source tagger
 
-# In[67]:
+# In[596]:
 
 src_language_train_data = load_tagged_sentences(trainFile)
 
 
-# In[17]:
+# In[597]:
+
+len(src_language_train_data)
+
+
+# In[598]:
 
 src_language_tagger = PerceptronTagger()
-train_tagger(src_language_tagger, src_language_train_data)
+import time 
+start = time.time()
+train_tagger(src_language_tagger, src_language_train_data, 5)
+end = time.time()
+print end-start
 
 
-# In[18]:
+# In[599]:
 
-src_language_init_test_data, src_test_sentence_w_correct_tags = get_test_corpus(testFile)
-
-
-# In[19]:
-
-src_guess_test_tags = tag_tagger(src_language_tagger, src_language_init_test_data)
+src_test_sentence_w_correct_tags = get_test_corpus(testFile)
+src_test_sentence_w_correct_tags[0:3]
 
 
-# In[80]:
+# In[600]:
 
-src_guess_test_tagsess_test_tags[:5]
+src_guess_test_tags = tag_tagger(src_language_tagger, convert_sentence_list_to_untagged_corpus(src_test_sentence_w_correct_tags))
 
 
-# In[20]:
+# In[ ]:
+
+
+
+
+# In[601]:
 
 # results
 analyze_tags(src_guess_test_tags, src_test_sentence_w_correct_tags)
 
 
-# In[99]:
+# In[689]:
 
 src_text_file = "../Data/UN/c.true.en.en_2_es"
 tgt_text_file = "../Data/UN/c.true.es.en_2_es"
 align_file = "../Data/UN/aligned.intersect.en_2_es"
-num_sents = 75000
+num_sents = 60000
 
 
 # ### Get alignments (do some filtering), tag source language, map to target language
 
-# In[100]:
+# In[690]:
 
 import time
 start = time.time()
@@ -426,17 +437,17 @@ end = time.time()
 print end-start
 
 
-# In[101]:
+# In[691]:
 
 tagged_source = tag_tagger(src_language_tagger, convert_sentence_list_no_tags_to_corpus(src_sent_list))
 
 
-# In[102]:
+# In[692]:
 
 src_sent_list[:3]
 
 
-# In[103]:
+# In[693]:
 
 filter_tagged_corpus(tagged_source, tgt_sent_list, alignments_list, 20, 0)
 
@@ -444,34 +455,34 @@ untagged_target = tgt_sent_list
 tagged_target_data = map_tags(tagged_source, untagged_target, alignments_list)
 
 
-# In[104]:
+# In[694]:
 
 pos_trigram_dict = generate_pos_trigrams(tagged_target_data, "NOTAG")
 
 replace_NOTAG_using_trigram(pos_trigram_dict, tagged_target_data, "NOTAG")
 
 
-# In[105]:
+# In[695]:
 
 tagged_target_data[0:7]
 
 
 # # Train target language tagger on alignment tagged data, Test
 
-# In[106]:
+# In[696]:
 
 target_language_tagger = PerceptronTagger()
 
 
-# In[107]:
+# In[697]:
 
-train_tagger(target_language_tagger, convert_tagged_to_train_format(tagged_target_data))
+train_tagger(target_language_tagger, tagged_target_data)
 
 
-# In[109]:
+# In[698]:
 
-tgt_language_test_data, tgt_test_sentence_w_correct_tags = get_test_corpus(es_train_file)
-tgt_guess_test_tags = tag_tagger(target_language_tagger, tgt_language_test_data)
+tgt_test_sentence_w_correct_tags = get_test_corpus(es_train_file)
+tgt_guess_test_tags = tag_tagger(target_language_tagger, convert_sentence_list_to_untagged_corpus(tgt_test_sentence_w_correct_tags))
 
 sort_by_right = lambda ((key_right,key_wrong), value): key_right
 sort_by_wrong = lambda ((key_right,key_wrong), value): key_wrong
@@ -495,6 +506,15 @@ analyze_tags(tgt_guess_test_tags, tgt_test_sentence_w_correct_tags, False, sort_
 # 75,000->15,274 - n=1 - avg_sent=99% of average correct confidence - min_token=0 of average conf of wrong 78.16% <br>
 # 30,000->13113 - n=1 - avg_sent=75% of average correct confidence - min_token=33% of average conf of wrong 76.57% <br>
 # 36,000->14760 - n=1 - avg_sent=0 of average correct confidence - min_token=100% of average conf of wrong 75.88% <br>
+# 
+# ### using trigram to tag untagged tokens before training: 
+# 75,000->14,187 - n=1 - avg_sent=99% of average correct confidence - min_token=0 of average conf of wrong 81.55% <br>
+# 
+# ### Alignment issues (src,tgt)
+# ['adoption', 'of', 'the', 'agenda', 'and', 'other', 'organizational', 'matters']<br>
+# ['aprobación', 'del', 'programa', 'y', 'otras', 'cuestiones', 'de', 'organización']<br>
+# [(0, 0), (1, 1), (3, 2), (4, 3), (5, 4), (6, 7), (7, 5)]<br>
+# 
 
 # # English Tagger Generated from English Tagged Data
 # ### To see how well this should work with perfect alignments

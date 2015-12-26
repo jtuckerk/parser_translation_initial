@@ -1,10 +1,11 @@
 
 # coding: utf-8
 
-# In[246]:
+# In[717]:
 
 from Parser import *
 import os
+import statistics as s
 from nlp_jtk import Token, Sentence
 import codecs
 import Parser
@@ -13,12 +14,12 @@ import nlp_jtk
 reload(nlp_jtk)
 
 
-# In[251]:
+# In[718]:
 
 class Language(object):
     def __init__(self, name, tagged_file_list=None):
-        self.tagger_train_iters = 5
-        self.parser_train_iters = 5 #?
+        self.tagger_train_iters = 10
+        self.parser_train_iters = 15 #?
         self.name = name
         if tagged_file_list is None:
             tagged_file_list = []
@@ -33,7 +34,7 @@ class Language(object):
             print "Training supervised "+self.name+" Tagger."
             self.train_supervised_tagger()
             print "Training supervised "+self.name+" Parser."
-            #self.train_supervised_parser()
+            self.train_supervised_parser()
                 
         if test:
             print self.name + " test results: "
@@ -67,6 +68,8 @@ class Language(object):
         pass
     
     def get_test_results(self, guess_tags, correct_tags):
+        tag_score_dict = {}
+        
         correct_tag_type ={}
         wrong_tag_type = {}
     
@@ -84,7 +87,11 @@ class Language(object):
             perfect_sentence = True
             for word_idx, correct_token in enumerate(correct_sentence.get_tokens()):
                 guess_token = guess_tags[sent_num].get_token_at(word_idx)
-                word = guess_token.orig
+                assert correct_token.orig == guess_token.orig
+                
+                for i, (feature, guess) in enumerate(guess_token.get_testable_attr_list()):
+                    tag_score_dict[feature] = tag_score_dict.get(feature, 0) + (guess==correct_token.get_testable_attr_list()[i][1])
+                
                 tag_guess = guess_token.pos_tag
                 guess_confidence = guess_token.conf
                 total_tags +=1
@@ -111,9 +118,11 @@ class Language(object):
         tag_word_acc = (100.00*(total_tags-total_wrong_tags))/total_tags
         tag_sentence_acc = (100.00*(total_sentences-total_wrong_sent))/total_sentences
 
-        print "tag token accuracy: " + str(word_acc) + "%"
-        print "tag sentence accuracy: " + str(sentence_acc) + "%"
+        print "tag token accuracy: " + str(tag_word_acc) + "%"
+        print "tag sentence accuracy: " + str(tag_sentence_acc) + "%"
         print "have not written tests for parse yet"
+        for feature, correct_count in tag_score_dict.iteritems():
+            print feature, "accuracy:", (100.0*correct_count)/total_tags
     
 
     def get_tagged_sentences(self, file_name):
@@ -122,6 +131,7 @@ class Language(object):
         words=[]
         tags=[]
         sentence_obj = Sentence()
+        sentence_obj.add_token(Token(orig_token='<start>'))
         on_sentence = False
         for line in codecs.open(file_name, 'r', encoding="utf-8"):
         
@@ -132,15 +142,18 @@ class Language(object):
                 tok.orig = vals[1]
                 tok.pos_tag = vals[3]
                 tok.head = int(vals[6])
+                tok.head_label = vals[7]
                 sentence_obj.add_token(tok)
             elif (on_sentence):
                 on_sentence=False
+                sentence_obj.add_token(Token(orig_token='ROOT'))
                 sentences_w_tags.append(sentence_obj)
                 sentence_obj = Sentence()
+                sentence_obj.add_token(Token(orig_token='<start>'))
     
         return sentences_w_tags # [ Sentence_obj, Sentence_obj]
     def get_train_data_set(self):
-        print "Tagged data: " + str(len(self.tagged_file_list)) + "files"
+        print "Tagged data: " + str(len(self.tagged_file_list)) + " files"
         print "Picking Largest"
         large_file = ""
         maxFileSize = 0
@@ -160,12 +173,37 @@ class Language(object):
                 test_list += self.get_tagged_sentences(f)
         return test_list
     
+    
     def convert_sentence_list_to_untagged_corpus(self, sentence_list):
-        return "\n".join(" ".join(x.words()) for x in sentence_list)
+        import copy
+        untagged_list = copy.deepcopy(sentence_list)
+        for sent in untagged_list:
+            sent.clear_tags()
+        return untagged_list
         
+        
+#use intern function for performance enhancement & pad tokens in the appropriate place
+def read_conll(loc):
+    for sent_str in open(loc).read().strip().split('\n\n'):
+        lines = [line.split() for line in sent_str.split('\n')]
+        words = DefaultList(''); tags = DefaultList('')
+        heads = [None]; labels = [None]
+        for i, (word, pos, head, label) in enumerate(lines):
+            words.append(intern(word))
+            #words.append(intern(normalize(word)))
+            tags.append(intern(pos))
+            heads.append(int(head) + 1 if head != '-1' else len(lines) + 1)
+            labels.append(label)
+        pad_tokens(words); pad_tokens(tags)
+        yield words, tags, heads, labels
 
 
-# In[252]:
+def pad_tokens(tokens):
+    tokens.insert(0, '<start>')
+    tokens.append('ROOT')
+
+
+# In[719]:
 
 class Translation(object):
     def __init__(self, src_language, tgt_language, src_file, tgt_file, align_file):
@@ -178,7 +216,7 @@ class Translation(object):
         self.align_file = align_file
 
 
-# In[253]:
+# In[720]:
 
 en_train_file='../../Data/UD_English/en-ud-train.conllu'
 en_test_file='../../Data/UD_English/en-ud-test.conllu'
@@ -186,9 +224,24 @@ en_3 = '../../Data/UD_English/en-ud-dev.conllu'
 en = Language("English", [en_train_file, en_test_file, en_3])
 
 
-# In[254]:
+# In[721]:
 
-en.setup(train=False, test=True)
+#en.setup(train=True, test=True)
+
+
+# In[ ]:
+
+en.train_supervised_tagger()
+
+
+# In[ ]:
+
+en.train_supervised_parser()
+
+
+# In[ ]:
+
+en.test_supervised()
 
 
 # In[ ]:

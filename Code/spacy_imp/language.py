@@ -229,17 +229,17 @@ en = Language("English", [en_train_file, en_test_file, en_3])
 #en.setup(train=True, test=True)
 
 
-# In[ ]:
+# In[722]:
 
 en.train_supervised_tagger()
 
 
-# In[ ]:
+# In[723]:
 
 en.train_supervised_parser()
 
 
-# In[ ]:
+# In[724]:
 
 en.test_supervised()
 

@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[73]:
+# In[78]:
 
 """A simple implementation of a greedy transition-based parser. Released under BSD license."""
 from os import path
@@ -99,7 +99,7 @@ class Spacy_Parser(object):
             self.confusion_matrix[best][guess] += 1
         return len([i for i in range(n-1) if parse.heads[i] == gold_heads[i]])
 
-    def train(self, sentences, nr_iter):
+    def train(self, sentences, nr_iter, tagger_train_iters=5):
 
         self.tagger.start_training(sentences)
 
@@ -113,7 +113,7 @@ class Spacy_Parser(object):
                 gold_parse = sent.heads()
                 gold_label = sent.head_labels()
                 corr += self.train_one(itn, words, gold_tags, gold_parse)
-                if itn < 5:
+                if itn < tagger_train_iters:
                     self.tagger.train_one(words, gold_tags)
                 total += len(words)
             print itn, '%.3f' % (float(corr) / float(total))
@@ -172,7 +172,7 @@ def get_gold_moves(n0, n, stack, heads, gold):
     # s0 will lose them.
     if deps_between(stack[-1], range(n0+1, n-1), gold):
         costly.add(LEFT)
-        costly.add(RIGHT)
+        costly.add(RIGHT) 
         
     moves = [m for m in MOVES if m not in costly]
     if not moves:
@@ -553,11 +553,6 @@ def main(model_dir, train_loc, heldout_in, heldout_gold):
     t2 = time.time()
     print 'Parsing took %0.3f ms' % ((t2-t1)*1000.0)
     print c, t, float(c)/t
-
-
-
-# In[ ]:
-
 
 
 

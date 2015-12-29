@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[717]:
+# In[784]:
 
 from Parser import *
 import os
@@ -14,12 +14,12 @@ import nlp_jtk
 reload(nlp_jtk)
 
 
-# In[718]:
+# In[785]:
 
 class Language(object):
     def __init__(self, name, tagged_file_list=None):
-        self.tagger_train_iters = 10
-        self.parser_train_iters = 15 #?
+        self.tagger_train_iters = 3
+        self.parser_train_iters = 6 #?
         self.name = name
         if tagged_file_list is None:
             tagged_file_list = []
@@ -42,9 +42,9 @@ class Language(object):
         
     def train_supervised_tagger(self):
         self.train_data = self.get_train_data_set()
-        print str(len(self.train_data)) + " tagger training sentences"
-        print str(self.tagger_train_iters) + " training iterations"
-        self.supervised_parser.tagger.train(self.train_data, nr_iter=self.tagger_train_iters)
+        #print str(len(self.train_data)) + " tagger training sentences"
+        #print str(self.tagger_train_iters) + " training iterations"
+        #self.supervised_parser.tagger.train(self.train_data, nr_iter=self.tagger_train_iters)
         
     def train_supervised_parser(self):
         if not self.train_data:
@@ -203,7 +203,7 @@ def pad_tokens(tokens):
     tokens.append('ROOT')
 
 
-# In[719]:
+# In[786]:
 
 class Translation(object):
     def __init__(self, src_language, tgt_language, src_file, tgt_file, align_file):
@@ -216,7 +216,7 @@ class Translation(object):
         self.align_file = align_file
 
 
-# In[720]:
+# In[787]:
 
 en_train_file='../../Data/UD_English/en-ud-train.conllu'
 en_test_file='../../Data/UD_English/en-ud-test.conllu'
@@ -224,24 +224,32 @@ en_3 = '../../Data/UD_English/en-ud-dev.conllu'
 en = Language("English", [en_train_file, en_test_file, en_3])
 
 
-# In[721]:
+# In[788]:
 
 #en.setup(train=True, test=True)
 
 
-# In[722]:
+# In[789]:
 
+import time
+start = time.time()
 en.train_supervised_tagger()
 
 
-# In[723]:
+# In[790]:
 
 en.train_supervised_parser()
 
 
-# In[724]:
+# In[791]:
 
 en.test_supervised()
+
+
+# In[792]:
+
+end = time.time()
+print "time: ", end-start
 
 
 # In[ ]:

@@ -6,7 +6,7 @@
 
 
 
-# In[64]:
+# In[72]:
 
 class Token:
     
@@ -32,7 +32,7 @@ class Token:
         #return "[" + self.orig+ ", "+ self.pos + ", "+ self.head+ "]"
 
 
-# In[65]:
+# In[73]:
 
 class Sentence(object):
     def __init__(self, tok_list=None):
@@ -56,7 +56,7 @@ class Sentence(object):
         return [x.pos_tag for x in self.token_list]
     
     def heads(self):
-        return [x.head for x in self.token_list]
+        return [x.head for x in self.token_list][1:]
     
     def head_strings(self):
         return [self.token_list[x.head].orig for x in self.token_list]
@@ -90,6 +90,11 @@ class Sentence(object):
             
     def __len__(self):
         return len(self.token_list)
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:

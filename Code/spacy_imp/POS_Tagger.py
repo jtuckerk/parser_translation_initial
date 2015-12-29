@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[12]:
+# In[14]:
 
 """
 Averaged perceptron classifier. Implementation geared for simplicity rather than
@@ -150,7 +150,7 @@ def train(nr_iter, examples):
     return model
 
 
-# In[13]:
+# In[15]:
 
 
 PICKLE = "trontagger-0.1.0.pickle"
@@ -323,12 +323,12 @@ def _pc(n, d):
     return (float(n) / d) * 100
 
 
-# In[10]:
+# In[16]:
 
 val = ["d","a"]
 
 
-# In[25]:
+# In[17]:
 
 a = ["a", "b", "c", "d"]
 ad = dict((clas,0) for clas in a)

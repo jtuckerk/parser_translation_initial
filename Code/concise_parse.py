@@ -474,7 +474,7 @@ def read_conll(loc):
         lines = [line.split() for line in sent_str.split('\n')]
         words = DefaultList(''); tags = DefaultList('')
         heads = [None]; labels = [None]
-        for i, (word, pos, head, label) in enumerate(lines):
+        for index, word,lem, pos, something, s1, head, label, s2, s3 in lines:
             words.append(intern(word))
             #words.append(intern(normalize(word)))
             tags.append(intern(pos))

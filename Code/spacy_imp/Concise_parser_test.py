@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[91]:
+# In[29]:
 
 """A simple implementation of a greedy transition-based parser. Released under BSD license."""
 from os import path
@@ -16,6 +16,7 @@ SHIFT = 0; RIGHT = 1; LEFT = 2;
 MOVES = (SHIFT, RIGHT, LEFT)
 START = ['-START-', '-START2-']
 END = ['-END-', '-END2-']
+
 
 
 class DefaultList(list):
@@ -59,6 +60,7 @@ class Parser(object):
             self.model.load(path.join(model_dir, 'parser.pickle'))
         self.tagger = PerceptronTagger(load=load)
         self.confusion_matrix = defaultdict(lambda: defaultdict(int))
+        self.non_projective_count = 0
 
     def save(self):
         self.model.save(path.join(os.path.dirname("tmp2"), 'parser.pickle'))
@@ -86,7 +88,9 @@ class Parser(object):
             valid_moves = get_valid_moves(i, n, len(stack))
             gold_moves = get_gold_moves(i, n, stack, parse.heads, gold_heads)
             guess = max(valid_moves, key=lambda move: scores[move])
-            assert gold_moves
+            if gold_moves == []:
+                self.non_projective_count +=1
+                return 0
             best = max(gold_moves, key=lambda move: scores[move])
             self.model.update(best, guess, features)
             i = transition(guess, i, stack, parse)
@@ -428,7 +432,7 @@ class PerceptronTagger(object):
                 counts[word][tag] += 1
                 self.classes.add(tag)
         freq_thresh = 20
-        ambiguity_thresh = 0.97
+        ambiguity_thresh = 0.93
         for word, tag_freqs in counts.items():
             tag, mode = max(tag_freqs.items(), key=lambda item: item[1])
             n = sum(tag_freqs.values())
@@ -486,7 +490,7 @@ def main(model_dir, train_loc, heldout_in, heldout_gold):
     input_sents = list(read_pos(heldout_in))
     parser = Parser(load=False)
     sentences = list(read_conll(train_loc))
-    train(parser, sentences, nr_iter=15)
+    train(parser, sentences, nr_iter=5)
     parser.save()
     c = 0
     t = 0
@@ -502,7 +506,8 @@ def main(model_dir, train_loc, heldout_in, heldout_gold):
             t += 1
     t2 = time.time()
     print 'Parsing took %0.3f ms' % ((t2-t1)*1000.0)
-    print c, t, float(c)/t
+    print c, t, 100.0*float(c)/t, "% accuracy"
+    print "non projective sentence count", parser.non_projective_count
 
 def read_conll(loc):
     count = 0
@@ -515,40 +520,56 @@ def read_conll(loc):
             #words.append(intern(normalize(word)))
             tags.append(intern(pos))
 
-            heads.append(int(head)+first if head != '0' else len(lines)+second)
+            heads.append(int(head) if head != '0' else len(lines))
             labels.append(label)
         pad_tokens(words); pad_tokens(tags)
-        if count ==3:
-            print words, tags, heads, labels
         count +=1
         yield words, tags, heads, labels
 
 
-# In[92]:
+# In[30]:
 
 train_set = "../../Data/test_pars_data/en-ud-train.conllu"
 test_set = "../../Data/test_pars_data/en-ud-test.conllu"
 heldout_in = "../../Data/test_pars_data/held_in.txt"
 
 
-# In[93]:
-
-import unittest
-for i in range(-3,4):
-    for j in range(-3,4):
-        first=i
-        second=j
-        count =1
-        try:
-            main("tmp", train_set, heldout_in, test_set)
-        except AssertionError:
-            count -=1
-
-        if count!=0:
-            print i,j, "====="
+# In[31]:
 
 
-# In[ ]:
+main("tmp", train_set, heldout_in, test_set)
+
+
+# In[32]:
+
+HTML(play_beep)
+
+
+# In[33]:
+
+from IPython.display import HTML
+from base64 import b64encode
+
+path_to_audio = "/vhome/tucker.kirven/spring/A-Tone-His_Self-1266414414.wav"
+audio_type = "wav"
+
+sound = open(path_to_audio, "rb").read()
+sound_encoded = b64encode(sound)
+sound_tag = """
+    <audio id="beep" controls src="data:audio/{1};base64,{0}">
+    </audio>""".format(sound_encoded, audio_type)
+
+play_beep = """
+<script type="text/javascript">
+    var audio = document.getElementById("beep");
+    audio.play();
+</script>
+"""
+
+HTML(sound_tag)
+
+
+# In[17]:
 
 
 

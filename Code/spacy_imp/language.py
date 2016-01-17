@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[784]:
+# In[26]:
 
 from Parser import *
 import os
@@ -14,7 +14,7 @@ import nlp_jtk
 reload(nlp_jtk)
 
 
-# In[785]:
+# In[27]:
 
 class Language(object):
     def __init__(self, name, tagged_file_list=None):
@@ -203,7 +203,7 @@ def pad_tokens(tokens):
     tokens.append('ROOT')
 
 
-# In[786]:
+# In[28]:
 
 class Translation(object):
     def __init__(self, src_language, tgt_language, src_file, tgt_file, align_file):
@@ -216,7 +216,7 @@ class Translation(object):
         self.align_file = align_file
 
 
-# In[787]:
+# In[29]:
 
 en_train_file='../../Data/UD_English/en-ud-train.conllu'
 en_test_file='../../Data/UD_English/en-ud-test.conllu'
@@ -224,32 +224,42 @@ en_3 = '../../Data/UD_English/en-ud-dev.conllu'
 en = Language("English", [en_train_file, en_test_file, en_3])
 
 
-# In[788]:
+# In[30]:
 
 #en.setup(train=True, test=True)
 
 
-# In[789]:
+# In[31]:
 
-import time
-start = time.time()
-en.train_supervised_tagger()
-
-
-# In[790]:
-
-en.train_supervised_parser()
+#import time
+#start = time.time()
+#en.train_supervised_tagger()
 
 
-# In[791]:
+# In[32]:
 
-en.test_supervised()
+#en.train_supervised_parser()
 
 
-# In[792]:
+# In[ ]:
 
-end = time.time()
-print "time: ", end-start
+#en.test_supervised()
+
+
+# In[ ]:
+
+#end = time.time()
+#print "time: ", end-start
+
+
+# In[ ]:
+
+
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:

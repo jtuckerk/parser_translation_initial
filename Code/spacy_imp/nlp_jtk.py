@@ -6,7 +6,7 @@
 
 
 
-# In[72]:
+# In[6]:
 
 class Token:
     
@@ -28,11 +28,11 @@ class Token:
         return [self.orig, self.pos_tag, self.head,self.head_label, self.conf]
     
     def __str__(self):
-        return "Token:"+str(self.attr_list)
+        return "Token:"+str(self.get_attr_list())
         #return "[" + self.orig+ ", "+ self.pos + ", "+ self.head+ "]"
 
 
-# In[73]:
+# In[18]:
 
 class Sentence(object):
     def __init__(self, tok_list=None):
@@ -50,6 +50,8 @@ class Sentence(object):
         return self.token_list
     
     def words(self):
+        if self.token_list == None:
+            print "WWWTTTTTFFFF"
         return [x.orig for x in self.token_list]
     
     def pos_tags(self):
@@ -64,6 +66,10 @@ class Sentence(object):
     def head_labels(self):
         return [x.head_label for x in self.token_list]
     
+    def add_words(self, words_list):
+        for word in words_list:
+            self.token_list.append(Token(word))
+            
     def set_heads(self, heads_list):
         #this is weird
         assert len(self.token_list)-1 == len(heads_list)
@@ -71,9 +77,9 @@ class Sentence(object):
             self.token_list[i+1].head = head
     
     def set_head_labels(self, head_label_list):
-        assert len(self.token_list) == len(heads_label_list)
-        for i, head_label in enumerate(heads_label_list):
-            self.token_list[i].head_label = head_label
+        assert len(self.token_list)-1 == len(head_label_list)
+        for i, head_label in enumerate(head_label_list):
+            self.token_list[i+1].head_label = head_label
     
     def set_pos_tags(self, pos_list):
         assert len(self.token_list) == len(pos_list)
@@ -87,6 +93,7 @@ class Sentence(object):
     def clear_tags(self):
         for tok in self.token_list:
             tok = Token(orig_token=tok.orig)
+        return self
             
     def __len__(self):
         return len(self.token_list)
